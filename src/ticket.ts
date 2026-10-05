@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
 import { execFileSync } from "node:child_process";
+import type { Config } from "./config.js";
+import { fetchJiraIssue } from "./jira.js";
 
 export interface Ticket {
   /** Short, filesystem-safe id, e.g. "issue-12" or "add-dark-mode". */
@@ -9,21 +11,31 @@ export interface Ticket {
   body: string;
   /** Present for GitHub issues; used to link the PR back to the issue. */
   issueNumber?: number;
+  /** Present for Jira issues, e.g. "PROJ-123"; used in the branch and PR title so Jira links them. */
+  jiraKey?: string;
   url?: string;
 }
 
 export type Source =
   | { kind: "file"; path: string }
-  | { kind: "issue"; ref: string };
+  | { kind: "issue"; ref: string }
+  | { kind: "jira"; key: string; baseUrl?: string };
 
 const ISSUE_URL = /github\.com\/[^/]+\/[^/]+\/issues\/\d+/;
+/** Jira keys are a project key, a dash and a number: PROJ-123. Always upper case in Jira. */
+const JIRA_KEY = /^[A-Z][A-Z0-9_]+-\d+$/;
+/** A Jira issue link: https://acme.atlassian.net/browse/PROJ-123, or a board link with ?selectedIssue=PROJ-123. */
+const JIRA_URL = /^(https?:\/\/[^/?#]+(?:\/[^?#]*?)??)\/(?:browse\/|.*[?&]selectedIssue=)([A-Z][A-Z0-9_]+-\d+)\b/;
 
-/** Work out whether the user pointed us at a markdown file or a GitHub issue. */
+/** Work out whether the user pointed us at a markdown file, a GitHub issue or a Jira issue. */
 export function parseSource(source: string, fileExists = existsSync): Source {
   if (fileExists(source)) return { kind: "file", path: source };
   if (/^#?\d+$/.test(source)) return { kind: "issue", ref: source.replace("#", "") };
   if (ISSUE_URL.test(source)) return { kind: "issue", ref: source };
-  throw new Error(`"${source}" isn't a file, an issue number, or a GitHub issue URL.`);
+  if (JIRA_KEY.test(source)) return { kind: "jira", key: source };
+  const jiraUrl = JIRA_URL.exec(source);
+  if (jiraUrl) return { kind: "jira", key: jiraUrl[2], baseUrl: jiraUrl[1] };
+  throw new Error(`"${source}" isn't a file, a GitHub issue number or URL, or a Jira issue key or URL.`);
 }
 
 /** Pull the title from the first "# " heading; everything else is the body. */
@@ -47,7 +59,18 @@ export function slugify(text: string, maxLength = 40): string {
     .replace(/-+$/, "");
 }
 
-export function loadTicket(source: Source): Ticket {
+export async function loadTicket(source: Source, config: Pick<Config, "jira">, env = process.env): Promise<Ticket> {
+  if (source.kind === "jira") {
+    const baseUrl = source.baseUrl ?? config.jira?.baseUrl ?? env.JIRA_BASE_URL;
+    if (!baseUrl) {
+      throw new Error(
+        `Don't know which Jira site ${source.key} is on. Run "ticket2pr init --jira https://yourcompany.atlassian.net", ` +
+          `add "jira": { "baseUrl": ... } to ticket2pr.config.json, or set JIRA_BASE_URL.`,
+      );
+    }
+    return fetchJiraIssue(source.key, baseUrl, { env });
+  }
+
   if (source.kind === "file") {
     const fallback = basename(source.path, extname(source.path));
     const { title, body } = parseMarkdownTicket(readFileSync(source.path, "utf8"), fallback);

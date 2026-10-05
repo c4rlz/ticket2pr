@@ -12,6 +12,7 @@ export function buildPrBody({ ticket, plan, agentSummary, tests }: PrBodyInput):
   const sections: string[] = [];
 
   if (ticket.issueNumber) sections.push(`Closes #${ticket.issueNumber}`);
+  if (ticket.jiraKey) sections.push(`Jira: [${ticket.jiraKey}](${ticket.url})`);
 
   sections.push(
     "> Draft opened by ticket2pr. The plan below was reviewed by a human before " +
@@ -33,6 +34,11 @@ export function buildPrBody({ ticket, plan, agentSummary, tests }: PrBodyInput):
   sections.push(`<details><summary>Approved plan</summary>\n\n${plan}\n</details>`);
 
   return sections.join("\n\n") + "\n";
+}
+
+/** Jira links a PR to its issue when the key is in the title, so lead with it. */
+export function prTitle(ticket: Ticket): string {
+  return ticket.jiraKey ? `${ticket.jiraKey}: ${ticket.title}` : ticket.title;
 }
 
 export function branchName(prefix: string, ticket: Ticket): string {

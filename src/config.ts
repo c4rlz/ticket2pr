@@ -7,6 +7,8 @@ export interface Config {
   branchPrefix: string;
   /** Command that runs the repo's tests, e.g. "npm test". Optional but strongly recommended. */
   testCommand?: string;
+  /** Set when tickets come from Jira. Credentials come from the environment, never this file. */
+  jira?: { baseUrl: string };
 }
 
 export const DEFAULT_CONFIG: Config = {

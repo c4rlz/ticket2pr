@@ -10,7 +10,8 @@ The checkpoint is the point: reviewing a plan takes two minutes, and catching a 
 
 - Node 20+
 - [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), installed and logged in (`claude` on your PATH)
-- [GitHub CLI](https://cli.github.com/), authenticated (`gh auth login`), for issues and PRs
+- [GitHub CLI](https://cli.github.com/), authenticated (`gh auth login`), for GitHub issues and for opening PRs
+- For Jira tickets: Jira credentials in your environment (see [Jira](#jira))
 
 ## Install
 
@@ -24,10 +25,11 @@ npm install && npm run build && npm link
 Once per repo, from its root:
 
 ```sh
-ticket2pr init
+ticket2pr init                                       # tickets are GitHub issues
+ticket2pr init --jira https://yourcompany.atlassian.net   # tickets are in Jira
 ```
 
-This adds a "Ticket" GitHub issue form (see [Writing a good ticket](#writing-a-good-ticket)), creates `ticket2pr.config.json` with your base branch and a detected test command (npm, pytest including a `.venv`, cargo, go or make), and adds `.ticket2pr/` to `.gitignore`. It never overwrites a file that already exists, so it's safe to run again. Check the test command it picked, then commit and push the new files.
+This adds a "Ticket" GitHub issue form (skipped with `--jira`) (see [Writing a good ticket](#writing-a-good-ticket)), creates `ticket2pr.config.json` with your base branch and a detected test command (npm, pytest including a `.venv`, cargo, go or make), and adds `.ticket2pr/` to `.gitignore`. It never overwrites a file that already exists, so it's safe to run again. Check the test command it picked, then commit and push the new files.
 
 ## Usage
 
@@ -40,6 +42,8 @@ ticket2pr check 12
 # 1. Plan. Reads the repo, changes nothing.
 ticket2pr plan 12                 # a GitHub issue number
 ticket2pr plan https://github.com/you/repo/issues/12
+ticket2pr plan PROJ-123           # a Jira issue key
+ticket2pr plan https://yourcompany.atlassian.net/browse/PROJ-123
 ticket2pr plan tickets/dark-mode.md   # or a markdown file
 
 # 2. Review. Edit .ticket2pr/issue-12/PLAN.md and answer its open questions.
@@ -94,6 +98,10 @@ per-user preferences, so this should be a small addition.
 
 `ticket2pr init` adds [`.github/ISSUE_TEMPLATE/ticket.yml`](.github/ISSUE_TEMPLATE/ticket.yml) to your repo. Once it's pushed, **New issue** offers a "Ticket" form with a field for each section above, with Context and Acceptance criteria required. ticket2pr reads the filled-in issue like any other.
 
+### In Jira
+
+Jira has no template file to commit. The closest equivalent is a default description for your issue type, set by a Jira admin, with the same headings as the template above. If you can't change Jira's settings, paste the template into the description by hand. `ticket2pr check PROJ-123` works either way.
+
 ### Checking a ticket
 
 Not sure your ticket is there yet? `ticket2pr check <ticket>` reviews it against this list, confirms that the files it points to actually exist, and suggests a rewrite with `[TODO]` markers for anything only you can fill in. It saves the result to `.ticket2pr/<id>/CHECK.md`.
@@ -110,7 +118,26 @@ Not sure your ticket is there yet? `ticket2pr check <ticket>` reviews it against
 }
 ```
 
+With `init --jira`, the config also gets `"jira": { "baseUrl": "https://yourcompany.atlassian.net" }`.
+
 Set `testCommand` if you can. The agent is allowed to run exactly that command and nothing else, and ticket2pr runs it again itself afterwards, so the PR reports what actually happened rather than what the agent says happened.
+
+## Jira
+
+ticket2pr reads tickets from Jira. The code and the draft PR still live on GitHub, as they do for most teams using Jira.
+
+**Credentials** come from environment variables, never from a file in the repo:
+
+| Jira | Set |
+| --- | --- |
+| Cloud (`*.atlassian.net`) | `JIRA_EMAIL` and `JIRA_API_TOKEN` ([create a token](https://id.atlassian.com/manage-profile/security/api-tokens)) |
+| Server or Data Center | `JIRA_PAT`, a personal access token from your Jira profile |
+
+**Which site** comes from, in order: the link you pass (`…/browse/PROJ-123`), `jira.baseUrl` in `ticket2pr.config.json`, then `JIRA_BASE_URL`. If you work across several clients, put each one's site in that repo's config and you can pass bare keys like `PROJ-123`.
+
+**Linking:** the branch is `ticket2pr/PROJ-123` and the PR title starts with `PROJ-123:`, so Jira's GitHub integration links the PR to the issue. The PR description also links to the issue.
+
+**What's read:** the summary and description. The description's formatting (headings, lists, code, tables, checklists, links) is converted to markdown. Attachments and custom fields aren't read, so put acceptance criteria in the description rather than a separate field.
 
 ## Customizing the prompts
 
@@ -128,7 +155,7 @@ No git, no network, no arbitrary shell. ticket2pr does branching, committing and
 
 ## Possible extensions
 
-Not planned, just noted: a GitHub Action triggered by a label, Notion/Linear/Jira ticket sources, other agent runtimes.
+Not planned, just noted: a GitHub Action triggered by a label, Linear/GitLab/Notion ticket sources, opening merge requests on GitLab, other agent runtimes.
 
 ## License
 

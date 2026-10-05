@@ -5,43 +5,56 @@ import { runAgent } from "./agent.js";
 import { loadConfig } from "./config.js";
 import { init } from "./init.js";
 import * as git from "./git.js";
-import { branchName, buildPrBody } from "./pr.js";
+import { branchName, buildPrBody, prTitle } from "./pr.js";
 import { loadPrompt, render } from "./prompts.js";
 import { formatTicket, loadTicket, parseSource, type Ticket } from "./ticket.js";
 
 const USAGE = `ticket2pr: ticket -> reviewed plan -> draft PR
 
 Usage:
-  ticket2pr init
-      Set up the current repo: add a "Ticket" GitHub issue form, create
-      ticket2pr.config.json, and ignore .ticket2pr/. Never overwrites anything.
+  ticket2pr init [--jira <https://yourcompany.atlassian.net>]
+      Set up the current repo: add a "Ticket" GitHub issue form (or, with
+      --jira, point at your Jira site instead), create ticket2pr.config.json,
+      and ignore .ticket2pr/. Never overwrites anything.
 
-  ticket2pr check <issue-number | issue-url | ticket.md>
+  ticket2pr check <ticket>
       Optional. Review the ticket itself before planning: what's missing,
       whether its pointers exist, and a suggested rewrite. Changes nothing.
 
-  ticket2pr plan <issue-number | issue-url | ticket.md>
+  ticket2pr plan <ticket>
       Explore the repo read-only and write a plan to .ticket2pr/<id>/PLAN.md.
       Read it, edit it, answer its open questions. Nothing is changed yet.
 
   ticket2pr implement <.ticket2pr/<id>> [--dry-run]
       Implement the approved plan on a new branch, run tests, open a draft PR.
       --dry-run stops after committing locally (no push, no PR).
+
+A <ticket> is any of:
+  12, #12 or a GitHub issue URL      GitHub issue (needs the gh CLI)
+  PROJ-123 or a Jira issue URL       Jira issue (needs Jira credentials, see README)
+  path/to/ticket.md                  a markdown file
 `;
 
-function setUp(): void {
+function setUp(jiraBaseUrl?: string): void {
+  if (jiraBaseUrl !== undefined && !/^https?:\/\/\S+$/.test(jiraBaseUrl)) {
+    throw new Error("--jira needs your Jira site's address, e.g. --jira https://yourcompany.atlassian.net");
+  }
   const root = git.repoRoot();
   if (!root) throw new Error("This isn't a git repository. Run ticket2pr init from the root of the repo you want to set up.");
   if (resolve(root) !== resolve(".")) throw new Error(`Run ticket2pr init from the root of the repo: ${root}`);
 
   console.log("Setting up ticket2pr in this repo:\n");
-  for (const line of init(git.defaultBranch())) console.log(line);
-  console.log("\nNext: commit these files, then push so the issue form shows up on GitHub.");
+  for (const line of init(git.defaultBranch(), { jiraBaseUrl })) console.log(line);
+  console.log(
+    jiraBaseUrl
+      ? "\nNext: commit these files, and set your Jira credentials (see the README)."
+      : "\nNext: commit these files, then push so the issue form shows up on GitHub.",
+  );
   console.log("Then write a ticket and run: ticket2pr check <ticket>\n");
 }
 
-function check(source: string): void {
-  const ticket = loadTicket(parseSource(source));
+async function check(source: string): Promise<void> {
+  const ticket = await loadTicket(parseSource(source), loadConfig());
   const dir = join(".ticket2pr", ticket.id);
   mkdirSync(dir, { recursive: true });
 
@@ -57,8 +70,8 @@ function check(source: string): void {
   console.log(`  ticket2pr plan ${source}\n`);
 }
 
-function plan(source: string): void {
-  const ticket = loadTicket(parseSource(source));
+async function plan(source: string): Promise<void> {
+  const ticket = await loadTicket(parseSource(source), loadConfig());
   const dir = join(".ticket2pr", ticket.id);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "ticket.json"), JSON.stringify(ticket, null, 2));
@@ -119,7 +132,7 @@ function implement(dir: string, dryRun: boolean): void {
   if (tests) console.log(`Tests ${tests.passed ? "passed" : "FAILED"}.`);
 
   const ref = ticket.issueNumber ? ` (#${ticket.issueNumber})` : "";
-  git.commitAll(`${ticket.title}${ref}`);
+  git.commitAll(`${prTitle(ticket)}${ref}`);
 
   const bodyPath = resolve(dir, "PR.md");
   writeFileSync(bodyPath, buildPrBody({ ticket, plan: planText, agentSummary: summary, tests }));
@@ -130,13 +143,16 @@ function implement(dir: string, dryRun: boolean): void {
   }
 
   git.pushBranch(branch);
-  const url = git.openDraftPr({ base: config.baseBranch, head: branch, title: ticket.title, bodyFile: bodyPath });
+  const url = git.openDraftPr({ base: config.baseBranch, head: branch, title: prTitle(ticket), bodyFile: bodyPath });
   console.log(`\nDraft PR: ${url}`);
 }
 
-function main(argv: string[]): void {
+async function main(argv: string[]): Promise<void> {
   const [command, target, ...flags] = argv;
-  if (command === "init") return setUp();
+  if (command === "init") {
+    const jiraFlag = argv.indexOf("--jira");
+    return setUp(jiraFlag === -1 ? undefined : (argv[jiraFlag + 1] ?? ""));
+  }
   if (command === "check" && target) return check(target);
   if (command === "plan" && target) return plan(target);
   if (command === "implement" && target) return implement(target, flags.includes("--dry-run"));
@@ -145,7 +161,7 @@ function main(argv: string[]): void {
 }
 
 try {
-  main(process.argv.slice(2));
+  await main(process.argv.slice(2));
 } catch (error) {
   console.error(`\n${error instanceof Error ? error.message : String(error)}`);
   process.exitCode = 1;

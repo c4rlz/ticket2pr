@@ -50,10 +50,13 @@ export function ignoresWorkspace(gitignore: string): boolean {
  * Set up the current repo for ticket2pr. Never overwrites anything that already exists.
  * Returns one line per step, describing what happened.
  */
-export function init(baseBranch: string): string[] {
+export function init(baseBranch: string, options: { jiraBaseUrl?: string } = {}): string[] {
   const report: string[] = [];
+  const jira = options.jiraBaseUrl ? { baseUrl: options.jiraBaseUrl.replace(/\/+$/, "") } : undefined;
 
-  if (existsSync(ISSUE_FORM_PATH)) {
+  if (jira) {
+    report.push("• Tickets come from Jira, so no GitHub issue form was added");
+  } else if (existsSync(ISSUE_FORM_PATH)) {
     report.push(`• ${ISSUE_FORM_PATH} already exists, left alone`);
   } else {
     mkdirSync(dirname(ISSUE_FORM_PATH), { recursive: true });
@@ -63,11 +66,12 @@ export function init(baseBranch: string): string[] {
 
   if (existsSync(CONFIG_FILE)) {
     report.push(`• ${CONFIG_FILE} already exists, left alone`);
+    if (jira) report.push(`  To use Jira, add this to it: "jira": ${JSON.stringify(jira)}`);
   } else {
     const testCommand = detectTestCommand();
-    const config: Config = { ...DEFAULT_CONFIG, baseBranch, ...(testCommand && { testCommand }) };
+    const config: Config = { ...DEFAULT_CONFIG, baseBranch, ...(testCommand && { testCommand }), ...(jira && { jira }) };
     writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n");
-    report.push(`✓ Created ${CONFIG_FILE} (base branch: ${baseBranch})`);
+    report.push(`✓ Created ${CONFIG_FILE} (base branch: ${baseBranch}${jira ? `, Jira: ${jira.baseUrl}` : ""})`);
     report.push(
       testCommand
         ? `  Test command: ${testCommand}. Check it's right; the agent may run exactly this and nothing else.`
