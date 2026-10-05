@@ -19,6 +19,16 @@ git clone <this repo> && cd ticket2pr
 npm install && npm run build && npm link
 ```
 
+## Set up a repo
+
+Once per repo, from its root:
+
+```sh
+ticket2pr init
+```
+
+This adds a "Ticket" GitHub issue form (see [Writing a good ticket](#writing-a-good-ticket)), creates `ticket2pr.config.json` with your base branch and a detected test command (npm, pytest including a `.venv`, cargo, go or make), and adds `.ticket2pr/` to `.gitignore`. It never overwrites a file that already exists, so it's safe to run again. Check the test command it picked, then commit and push the new files.
+
 ## Usage
 
 From the root of the repo you want to change:
@@ -39,7 +49,7 @@ ticket2pr implement .ticket2pr/issue-12
 ticket2pr implement .ticket2pr/issue-12 --dry-run   # commit locally, no push or PR
 ```
 
-Add `.ticket2pr/` to your `.gitignore`. ticket2pr never commits it either way.
+ticket2pr never commits its `.ticket2pr/` working folder, whether or not it's in your `.gitignore`.
 
 ## Writing a good ticket
 
@@ -82,12 +92,7 @@ per-user preferences, so this should be a small addition.
 
 ### GitHub issue template
 
-If your tickets are GitHub issues, copy [`.github/ISSUE_TEMPLATE/ticket.yml`](.github/ISSUE_TEMPLATE/ticket.yml) into the same path in your repo. **New issue** will then offer a "Ticket" form with a field for each section above, with Context and Acceptance criteria required. ticket2pr reads the filled-in issue like any other.
-
-```sh
-mkdir -p .github/ISSUE_TEMPLATE
-cp /path/to/ticket2pr/.github/ISSUE_TEMPLATE/ticket.yml .github/ISSUE_TEMPLATE/
-```
+`ticket2pr init` adds [`.github/ISSUE_TEMPLATE/ticket.yml`](.github/ISSUE_TEMPLATE/ticket.yml) to your repo. Once it's pushed, **New issue** offers a "Ticket" form with a field for each section above, with Context and Acceptance criteria required. ticket2pr reads the filled-in issue like any other.
 
 ### Checking a ticket
 
@@ -95,7 +100,7 @@ Not sure your ticket is there yet? `ticket2pr check <ticket>` reviews it against
 
 ## Configuration
 
-Optional `ticket2pr.config.json` in the target repo:
+`ticket2pr init` creates `ticket2pr.config.json` in the target repo. You can also write or edit it by hand:
 
 ```json
 {

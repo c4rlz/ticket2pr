@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runAgent } from "./agent.js";
 import { loadConfig } from "./config.js";
+import { init } from "./init.js";
 import * as git from "./git.js";
 import { branchName, buildPrBody } from "./pr.js";
 import { loadPrompt, render } from "./prompts.js";
@@ -11,6 +12,10 @@ import { formatTicket, loadTicket, parseSource, type Ticket } from "./ticket.js"
 const USAGE = `ticket2pr: ticket -> reviewed plan -> draft PR
 
 Usage:
+  ticket2pr init
+      Set up the current repo: add a "Ticket" GitHub issue form, create
+      ticket2pr.config.json, and ignore .ticket2pr/. Never overwrites anything.
+
   ticket2pr check <issue-number | issue-url | ticket.md>
       Optional. Review the ticket itself before planning: what's missing,
       whether its pointers exist, and a suggested rewrite. Changes nothing.
@@ -23,6 +28,17 @@ Usage:
       Implement the approved plan on a new branch, run tests, open a draft PR.
       --dry-run stops after committing locally (no push, no PR).
 `;
+
+function setUp(): void {
+  const root = git.repoRoot();
+  if (!root) throw new Error("This isn't a git repository. Run ticket2pr init from the root of the repo you want to set up.");
+  if (resolve(root) !== resolve(".")) throw new Error(`Run ticket2pr init from the root of the repo: ${root}`);
+
+  console.log("Setting up ticket2pr in this repo:\n");
+  for (const line of init(git.defaultBranch())) console.log(line);
+  console.log("\nNext: commit these files, then push so the issue form shows up on GitHub.");
+  console.log("Then write a ticket and run: ticket2pr check <ticket>\n");
+}
 
 function check(source: string): void {
   const ticket = loadTicket(parseSource(source));
@@ -120,6 +136,7 @@ function implement(dir: string, dryRun: boolean): void {
 
 function main(argv: string[]): void {
   const [command, target, ...flags] = argv;
+  if (command === "init") return setUp();
   if (command === "check" && target) return check(target);
   if (command === "plan" && target) return plan(target);
   if (command === "implement" && target) return implement(target, flags.includes("--dry-run"));

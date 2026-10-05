@@ -39,3 +39,24 @@ export function runTests(command: string): { passed: boolean; tail: string } {
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim().split("\n");
   return { passed: result.status === 0, tail: output.slice(-40).join("\n") };
 }
+
+/** Like git(), but returns undefined instead of throwing, and keeps git's stderr quiet. */
+function tryGit(...args: string[]): string | undefined {
+  try {
+    return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+/** The top-level folder of the repo containing the current directory, if any. */
+export function repoRoot(): string | undefined {
+  return tryGit("rev-parse", "--show-toplevel");
+}
+
+/** The remote's default branch if git knows it, otherwise the current branch, otherwise "main". */
+export function defaultBranch(): string {
+  const remoteHead = tryGit("symbolic-ref", "--short", "refs/remotes/origin/HEAD");
+  if (remoteHead) return remoteHead.replace(/^origin\//, "");
+  return tryGit("branch", "--show-current") || "main";
+}
