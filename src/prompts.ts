@@ -8,7 +8,7 @@ const BUILT_IN_DIR = fileURLToPath(new URL("../../prompts/", import.meta.url));
 /** Drop a file with the same name here to override a built-in prompt for one repo. */
 export const OVERRIDE_DIR = join(".ticket2pr", "prompts");
 
-export function loadPrompt(name: "plan" | "implement"): string {
+export function loadPrompt(name: "check" | "plan" | "implement"): string {
   const override = join(OVERRIDE_DIR, `${name}.md`);
   const path = existsSync(override) ? override : join(BUILT_IN_DIR, `${name}.md`);
   return readFileSync(path, "utf8");

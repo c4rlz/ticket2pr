@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseMarkdownTicket, parseSource, slugify } from "../src/ticket.js";
-import { render } from "../src/prompts.js";
+import { loadPrompt, render } from "../src/prompts.js";
 import { branchName, buildPrBody } from "../src/pr.js";
 
 const noFiles = () => false;
@@ -36,6 +36,14 @@ test("slugify makes safe, short ids", () => {
 test("render fills placeholders and rejects unknown ones", () => {
   assert.equal(render("Hi {{name}}", { name: "Carly" }), "Hi Carly");
   assert.throws(() => render("Hi {{nmae}}", { name: "Carly" }), /nmae/);
+});
+
+test("every built-in prompt renders with the values the CLI provides", () => {
+  const ticket = { ticket: "# A ticket" };
+  assert.match(render(loadPrompt("check"), ticket), /# A ticket/);
+  assert.match(render(loadPrompt("plan"), ticket), /# A ticket/);
+  const implement = render(loadPrompt("implement"), { ...ticket, plan: "the plan", testInstruction: "run tests" });
+  assert.match(implement, /the plan/);
 });
 
 test("buildPrBody links the issue, reports tests honestly and includes the plan", () => {

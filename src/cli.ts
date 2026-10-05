@@ -11,6 +11,10 @@ import { formatTicket, loadTicket, parseSource, type Ticket } from "./ticket.js"
 const USAGE = `ticket2pr: ticket -> reviewed plan -> draft PR
 
 Usage:
+  ticket2pr check <issue-number | issue-url | ticket.md>
+      Optional. Review the ticket itself before planning: what's missing,
+      whether its pointers exist, and a suggested rewrite. Changes nothing.
+
   ticket2pr plan <issue-number | issue-url | ticket.md>
       Explore the repo read-only and write a plan to .ticket2pr/<id>/PLAN.md.
       Read it, edit it, answer its open questions. Nothing is changed yet.
@@ -19,6 +23,23 @@ Usage:
       Implement the approved plan on a new branch, run tests, open a draft PR.
       --dry-run stops after committing locally (no push, no PR).
 `;
+
+function check(source: string): void {
+  const ticket = loadTicket(parseSource(source));
+  const dir = join(".ticket2pr", ticket.id);
+  mkdirSync(dir, { recursive: true });
+
+  console.log(`Checking ticket: ${ticket.title}\n(reading the repo; nothing will be changed)\n`);
+  const prompt = render(loadPrompt("check"), { ticket: formatTicket(ticket) });
+  const review = runAgent(prompt, { allowedTools: ["Read", "Grep", "Glob"] });
+
+  const checkPath = join(dir, "CHECK.md");
+  writeFileSync(checkPath, review + "\n");
+
+  console.log(`${review}\n`);
+  console.log(`Saved to ${checkPath}. Improve the ticket if needed, then run:`);
+  console.log(`  ticket2pr plan ${source}\n`);
+}
 
 function plan(source: string): void {
   const ticket = loadTicket(parseSource(source));
@@ -99,6 +120,7 @@ function implement(dir: string, dryRun: boolean): void {
 
 function main(argv: string[]): void {
   const [command, target, ...flags] = argv;
+  if (command === "check" && target) return check(target);
   if (command === "plan" && target) return plan(target);
   if (command === "implement" && target) return implement(target, flags.includes("--dry-run"));
   console.log(USAGE);

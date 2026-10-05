@@ -24,6 +24,9 @@ npm install && npm run build && npm link
 From the root of the repo you want to change:
 
 ```sh
+# 0. Optional: check the ticket first. Reads the repo, changes nothing.
+ticket2pr check 12
+
 # 1. Plan. Reads the repo, changes nothing.
 ticket2pr plan 12                 # a GitHub issue number
 ticket2pr plan https://github.com/you/repo/issues/12
@@ -37,6 +40,47 @@ ticket2pr implement .ticket2pr/issue-12 --dry-run   # commit locally, no push or
 ```
 
 Add `.ticket2pr/` to your `.gitignore`. ticket2pr never commits it either way.
+
+## Writing a good ticket
+
+The plan can only be as good as the ticket. The planning agent treats acceptance criteria, out-of-scope items, pointers and constraints as binding, so the more of them you give it, the less it has to guess. A good ticket has:
+
+- **A specific title.** One change, named concretely: "Add a dark mode toggle to settings", not "UI improvements".
+- **Context.** Why the change is wanted and who it's for, so the agent can make sensible judgment calls.
+- **Acceptance criteria.** Observable, checkable outcomes. Each one should be something a test or a reviewer could confirm.
+- **Out of scope.** What this change deliberately won't do. This is the best defence against a sprawling diff.
+- **Pointers.** Files, functions or similar existing features to start from, if you know them.
+- **Constraints.** No new dependencies, must stay backwards compatible, must follow an existing pattern, and so on.
+- **One PR's worth of work.** If it's really several independent changes, split it into several tickets.
+
+A template you can copy into an issue or a `tickets/*.md` file:
+
+```markdown
+# Add a dark mode toggle to settings
+
+## Context
+Users working at night find the app too bright. We already store
+per-user preferences, so this should be a small addition.
+
+## Acceptance criteria
+- Settings has a "Dark mode" toggle, off by default.
+- Turning it on switches the app to the dark theme immediately, without a reload.
+- The choice persists across sessions.
+
+## Out of scope
+- Following the operating system's theme automatically.
+- Restyling individual components beyond what the theme tokens cover.
+
+## Pointers
+- `src/settings/SettingsPage.tsx`
+- `src/theme/tokens.ts`
+- Preferences are saved the same way as the existing "compact view" setting.
+
+## Constraints
+- No new dependencies.
+```
+
+Not sure your ticket is there yet? `ticket2pr check <ticket>` reviews it against this list, confirms that the files it points to actually exist, and suggests a rewrite with `[TODO]` markers for anything only you can fill in. It saves the result to `.ticket2pr/<id>/CHECK.md`.
 
 ## Configuration
 
@@ -54,12 +98,13 @@ Set `testCommand` if you can. The agent is allowed to run exactly that command a
 
 ## Customizing the prompts
 
-The prompts are plain markdown in [`prompts/`](prompts/). To tune them for one repo, copy either file into that repo's `.ticket2pr/prompts/` and edit it there. Placeholders like `{{ticket}}` are filled in at run time; a typo in a placeholder is an error, not silent garbage.
+The prompts are plain markdown in [`prompts/`](prompts/). To tune them for one repo, copy any of them into that repo's `.ticket2pr/prompts/` and edit it there. Placeholders like `{{ticket}}` are filled in at run time; a typo in a placeholder is an error, not silent garbage.
 
 ## What the agent can do
 
 | Step | Tools | Edits files? |
 | --- | --- | --- |
+| `check` | Read, Grep, Glob | No |
 | `plan` | Read, Grep, Glob | No |
 | `implement` | Read, Grep, Glob, Edit, Write, and your `testCommand` | Yes, on a new branch |
 
