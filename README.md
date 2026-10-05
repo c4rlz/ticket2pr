@@ -80,6 +80,17 @@ per-user preferences, so this should be a small addition.
 - No new dependencies.
 ```
 
+### GitHub issue template
+
+If your tickets are GitHub issues, copy [`.github/ISSUE_TEMPLATE/ticket.yml`](.github/ISSUE_TEMPLATE/ticket.yml) into the same path in your repo. **New issue** will then offer a "Ticket" form with a field for each section above, with Context and Acceptance criteria required. ticket2pr reads the filled-in issue like any other.
+
+```sh
+mkdir -p .github/ISSUE_TEMPLATE
+cp /path/to/ticket2pr/.github/ISSUE_TEMPLATE/ticket.yml .github/ISSUE_TEMPLATE/
+```
+
+### Checking a ticket
+
 Not sure your ticket is there yet? `ticket2pr check <ticket>` reviews it against this list, confirms that the files it points to actually exist, and suggests a rewrite with `[TODO]` markers for anything only you can fill in. It saves the result to `.ticket2pr/<id>/CHECK.md`.
 
 ## Configuration

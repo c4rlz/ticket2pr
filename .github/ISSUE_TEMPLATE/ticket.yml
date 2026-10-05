@@ -1,0 +1,49 @@
+name: Ticket
+description: A change sized for one pull request, written so ticket2pr (or a person) can plan it without guessing.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Name one concrete change in the title, e.g. "Add a dark mode toggle to settings", not "UI improvements".
+        If this is really several independent changes, open one issue per change.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this change wanted, and who is it for? Enough that someone new to it could make sensible judgment calls.
+      placeholder: Users working at night find the app too bright. We already store per-user preferences, so this should be a small addition.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Observable, checkable outcomes. Each one should be something a test or a reviewer could confirm.
+      placeholder: |
+        - Settings has a "Dark mode" toggle, off by default.
+        - Turning it on switches to the dark theme immediately, without a reload.
+        - The choice persists across sessions.
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What this change deliberately won't do.
+      placeholder: |
+        - Following the operating system's theme automatically.
+  - type: textarea
+    id: pointers
+    attributes:
+      label: Pointers
+      description: Files, functions or similar existing features to start from, if you know them.
+      placeholder: |
+        - `src/settings/SettingsPage.tsx`
+        - Saved the same way as the existing "compact view" setting.
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Anything binding, e.g. no new dependencies, must stay backwards compatible, must follow an existing pattern.
+      placeholder: |
+        - No new dependencies.
