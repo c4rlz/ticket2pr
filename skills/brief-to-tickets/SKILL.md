@@ -38,6 +38,8 @@ ticket2pr's implement agent is deliberately boxed in. It can read and edit files
 - A test runner and a passing `testCommand`. Without one, ticket2pr can't report honest test results, which is half its value.
 - Databases, extensions, migrations, accounts, API keys and environment variables. Name what's needed, but never ask for secret values or put them in a ticket.
 
+The same limit applies inside a ticket. If a ticket's output includes a file that only a command can produce (a generated dataset, a lockfile, a migration, a build artifact), the agent can write the generator but can't run it, so its tests fail on the missing file. Either say in the ticket that the tests must not depend on that file, or list "run the generator and commit its output" as a step done by hand after `implement`.
+
 Keep this list short and concrete. It's a checklist the user works through, not a ticket.
 
 ## 4. Slice the rest into tickets
