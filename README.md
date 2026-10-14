@@ -1,5 +1,7 @@
 # ticket2pr
 
+[![CI](https://github.com/c4rlz/ticket2pr/actions/workflows/ci.yml/badge.svg)](https://github.com/c4rlz/ticket2pr/actions/workflows/ci.yml)
+
 Turn a ticket into an implementation plan you can review, then into a draft pull request.
 
 Most "AI writes your PR" tools go straight from ticket to code. ticket2pr stops in the middle. The agent explores your repo read-only and writes a plan, with the files it'll touch, the tests it'll add, the risks it sees, and the questions it couldn't answer on its own. You read and edit that plan. Only then does it write code, on a fresh branch, and open a **draft** PR with the approved plan and honest test results attached.
