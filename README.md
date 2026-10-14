@@ -108,6 +108,18 @@ Jira has no template file to commit. The closest equivalent is a default descrip
 
 Not sure your ticket is there yet? `ticket2pr check <ticket>` reviews it against this list, confirms that the files it points to actually exist, and suggests a rewrite with `[TODO]` markers for anything only you can fill in. It saves the result to `.ticket2pr/<id>/CHECK.md`.
 
+## From a brief to tickets
+
+A brief for a whole project or a big feature is too much for one ticket. The `brief-to-tickets` Claude Code skill in [`skills/`](skills/brief-to-tickets/SKILL.md) reads a brief (a Claude Doc, a Notion page, a markdown file or pasted text) and suggests a breakdown: the setup you need to do by hand first (repo, scaffolding, dependencies, a test command), then one ticket per PR in build order, in the template above. Once you approve the breakdown, it writes the tickets to `tickets/NN-slug.md`, ready for `ticket2pr check` and `plan`.
+
+To use it in every project, link it into your personal skills folder:
+
+```sh
+ln -s "$(pwd)/skills/brief-to-tickets" ~/.claude/skills/brief-to-tickets
+```
+
+Then ask Claude Code to "break this brief into tickets" and give it the brief.
+
 ## Configuration
 
 `ticket2pr init` creates `ticket2pr.config.json` in the target repo. You can also write or edit it by hand:
