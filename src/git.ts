@@ -15,6 +15,23 @@ export function createBranch(name: string, base: string): void {
   git("checkout", "-b", name, base);
 }
 
+export function checkout(name: string): void {
+  git("checkout", "-q", name);
+}
+
+export function currentBranch(): string {
+  return git("branch", "--show-current");
+}
+
+export function branchExists(name: string): boolean {
+  return tryGit("rev-parse", "--verify", "--quiet", `refs/heads/${name}`) !== undefined;
+}
+
+/** How many commits the current branch has that `base` doesn't. */
+export function commitsAhead(base: string): number {
+  return Number(git("rev-list", "--count", `${base}..HEAD`));
+}
+
 export function commitAll(message: string): void {
   // Stage everything, then unstage our workspace. An exclude pathspec can't do this in one step:
   // git add rejects it when .ticket2pr/ is gitignored, which `ticket2pr init` makes the norm.
@@ -25,6 +42,21 @@ export function commitAll(message: string): void {
 
 export function pushBranch(name: string): void {
   git("push", "-u", "origin", name);
+}
+
+/** The URL of an open PR for this branch, if there is one. */
+export function findOpenPr(head: string): string | undefined {
+  try {
+    const url = execFileSync(
+      "gh",
+      ["pr", "list", "--head", head, "--state", "open", "--json", "url", "--jq", ".[0].url // empty"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+    return url || undefined;
+  } catch {
+    // If gh can't answer, opening the PR will fail with gh's own error message.
+    return undefined;
+  }
 }
 
 export function openDraftPr(opts: { base: string; head: string; title: string; bodyFile: string }): string {

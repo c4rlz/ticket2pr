@@ -7,6 +7,7 @@ import { init } from "./init.js";
 import * as git from "./git.js";
 import { branchName, buildPrBody, prTitle } from "./pr.js";
 import { loadPrompt, render } from "./prompts.js";
+import { resumePoint } from "./resume.js";
 import { formatTicket, loadTicket, parseSource, type Ticket } from "./ticket.js";
 
 const USAGE = `ticket2pr: ticket -> reviewed plan -> draft PR
@@ -28,6 +29,8 @@ Usage:
   ticket2pr implement <.ticket2pr/<id>> [--dry-run]
       Implement the approved plan on a new branch, run tests, open a draft PR.
       --dry-run stops after committing locally (no push, no PR).
+      Safe to run again if it stops partway: it reuses the agent's work and
+      skips whatever is already done.
 
 A <ticket> is any of:
   12, #12 or a GitHub issue URL      GitHub issue (needs the gh CLI)
@@ -94,35 +97,58 @@ function implement(dir: string, dryRun: boolean): void {
   if (!existsSync(ticketPath) || !existsSync(planPath)) {
     throw new Error(`${dir} doesn't look like a plan folder. Run "ticket2pr plan" first.`);
   }
-  if (git.hasUncommittedChanges()) {
-    throw new Error("You have uncommitted changes. Commit or stash them first.");
-  }
-
   const config = loadConfig();
   const ticket = JSON.parse(readFileSync(ticketPath, "utf8")) as Ticket;
   const planText = readFileSync(planPath, "utf8").trim();
   const branch = branchName(config.branchPrefix, ticket);
+  const summaryPath = join(dir, "SUMMARY.md");
 
-  git.createBranch(branch, config.baseBranch);
-  console.log(`On branch ${branch}. Implementing the approved plan...\n`);
+  // Safe to run again after a crash: an existing branch is picked up where it stopped.
+  const exists = git.branchExists(branch);
+  const onBranch = exists && git.currentBranch() === branch;
+  if (!onBranch && git.hasUncommittedChanges()) {
+    throw new Error("You have uncommitted changes. Commit or stash them first.");
+  }
+  if (!exists) git.createBranch(branch, config.baseBranch);
+  else if (!onBranch) git.checkout(branch);
 
-  const testInstruction = config.testCommand
-    ? `Run the tests with \`${config.testCommand}\` and fix any failures your change causes.`
-    : "No test command is configured, so you can't run tests. Say so in your summary.";
-
-  const allowedTools = ["Read", "Grep", "Glob", "Edit", "Write"];
-  if (config.testCommand) allowedTools.push(`Bash(${config.testCommand})`);
-
-  const prompt = render(loadPrompt("implement"), {
-    ticket: formatTicket(ticket),
-    plan: planText,
-    testInstruction,
+  const point = resumePoint({
+    exists,
+    dirty: git.hasUncommittedChanges(),
+    ahead: git.commitsAhead(config.baseBranch),
+    hasSummary: existsSync(summaryPath),
   });
-  const summary = runAgent(prompt, { allowedTools, permissionMode: "acceptEdits" });
-  writeFileSync(join(dir, "SUMMARY.md"), summary + "\n");
 
-  if (!git.hasUncommittedChanges()) {
-    throw new Error(`The agent made no changes. Its summary is in ${dir}/SUMMARY.md.`);
+  let summary: string;
+  if (point === "after-agent") {
+    summary = readFileSync(summaryPath, "utf8").trim();
+    console.log(`On branch ${branch}. Reusing the agent's work from the earlier run.`);
+    console.log(`(To start over instead: git checkout ${config.baseBranch} && git branch -D ${branch})\n`);
+  } else {
+    console.log(
+      point === "fresh"
+        ? `On branch ${branch}. Implementing the approved plan...\n`
+        : `On existing branch ${branch}. The earlier run didn't finish, so implementing the plan again...\n`,
+    );
+
+    const testInstruction = config.testCommand
+      ? `Run the tests with \`${config.testCommand}\` and fix any failures your change causes.`
+      : "No test command is configured, so you can't run tests. Say so in your summary.";
+
+    const allowedTools = ["Read", "Grep", "Glob", "Edit", "Write"];
+    if (config.testCommand) allowedTools.push(`Bash(${config.testCommand})`);
+
+    const prompt = render(loadPrompt("implement"), {
+      ticket: formatTicket(ticket),
+      plan: planText,
+      testInstruction,
+    });
+    summary = runAgent(prompt, { allowedTools, permissionMode: "acceptEdits" });
+    writeFileSync(summaryPath, summary + "\n");
+  }
+
+  if (!git.hasUncommittedChanges() && git.commitsAhead(config.baseBranch) === 0) {
+    throw new Error(`The agent made no changes. Its summary is in ${summaryPath}.`);
   }
 
   // Run the tests ourselves, so the PR reports what actually happened, not what the agent says happened.
@@ -132,7 +158,7 @@ function implement(dir: string, dryRun: boolean): void {
   if (tests) console.log(`Tests ${tests.passed ? "passed" : "FAILED"}.`);
 
   const ref = ticket.issueNumber ? ` (#${ticket.issueNumber})` : "";
-  git.commitAll(`${prTitle(ticket)}${ref}`);
+  if (git.hasUncommittedChanges()) git.commitAll(`${prTitle(ticket)}${ref}`);
 
   const bodyPath = resolve(dir, "PR.md");
   writeFileSync(bodyPath, buildPrBody({ ticket, plan: planText, agentSummary: summary, tests }));
@@ -143,6 +169,11 @@ function implement(dir: string, dryRun: boolean): void {
   }
 
   git.pushBranch(branch);
+  const existing = git.findOpenPr(branch);
+  if (existing) {
+    console.log(`\nPR already open: ${existing}`);
+    return;
+  }
   const url = git.openDraftPr({ base: config.baseBranch, head: branch, title: prTitle(ticket), bodyFile: bodyPath });
   console.log(`\nDraft PR: ${url}`);
 }

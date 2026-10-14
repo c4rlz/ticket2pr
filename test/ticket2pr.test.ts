@@ -9,7 +9,8 @@ import { branchName, buildPrBody, prTitle } from "../src/pr.js";
 import { adfToMarkdown, fetchJiraIssue, jiraAuthFromEnv, type AdfNode } from "../src/jira.js";
 import { loadTicket } from "../src/ticket.js";
 import { detectTestCommand, ignoresWorkspace, init } from "../src/init.js";
-import { commitAll, git } from "../src/git.js";
+import { branchExists, checkout, commitAll, commitsAhead, createBranch, currentBranch, git } from "../src/git.js";
+import { resumePoint } from "../src/resume.js";
 
 const noFiles = () => false;
 
@@ -297,3 +298,44 @@ for (const gitignore of [".ticket2pr/\n", ""]) {
     }
   });
 }
+
+test("resumePoint reuses the agent's work only when it finished and left changes", () => {
+  const base = { exists: true, dirty: false, ahead: 0, hasSummary: false };
+  assert.equal(resumePoint({ ...base, exists: false, hasSummary: true, dirty: true }), "fresh");
+  // Crashed in tests or commit: changes uncommitted, summary written.
+  assert.equal(resumePoint({ ...base, dirty: true, hasSummary: true }), "after-agent");
+  // Crashed in push or PR: already committed.
+  assert.equal(resumePoint({ ...base, ahead: 1, hasSummary: true }), "after-agent");
+  // Crashed while the agent was working: no summary yet.
+  assert.equal(resumePoint({ ...base, dirty: true }), "run-agent");
+  // The agent finished but changed nothing.
+  assert.equal(resumePoint({ ...base, hasSummary: true }), "run-agent");
+});
+
+test("branch helpers report what an earlier run left behind", () => {
+  const dir = tempRepo({ "README.md": "hi\n" });
+  const previous = process.cwd();
+  process.chdir(dir);
+  try {
+    git("init", "-q", "-b", "main");
+    git("config", "user.name", "t");
+    git("config", "user.email", "t@t");
+    git("add", "-A");
+    git("commit", "-q", "-m", "init");
+
+    assert.equal(branchExists("ticket2pr/12"), false);
+    createBranch("ticket2pr/12", "main");
+    assert.equal(branchExists("ticket2pr/12"), true);
+    assert.equal(currentBranch(), "ticket2pr/12");
+    assert.equal(commitsAhead("main"), 0);
+
+    writeFileSync("feature.ts", "export {};\n");
+    commitAll("Add feature");
+    assert.equal(commitsAhead("main"), 1);
+
+    checkout("main");
+    assert.equal(currentBranch(), "main");
+  } finally {
+    process.chdir(previous);
+  }
+});
