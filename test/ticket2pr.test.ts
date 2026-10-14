@@ -9,6 +9,7 @@ import { branchName, buildPrBody, prTitle } from "../src/pr.js";
 import { adfToMarkdown, fetchJiraIssue, jiraAuthFromEnv, type AdfNode } from "../src/jira.js";
 import { loadTicket } from "../src/ticket.js";
 import { detectTestCommand, ignoresWorkspace, init } from "../src/init.js";
+import { commitAll, git } from "../src/git.js";
 
 const noFiles = () => false;
 
@@ -273,3 +274,26 @@ test("init --jira points the config at Jira instead of adding the issue form", (
     process.chdir(previous);
   }
 });
+
+for (const gitignore of [".ticket2pr/\n", ""]) {
+  test(`commitAll commits the work but never .ticket2pr/ (${gitignore ? "ignored" : "not ignored"})`, () => {
+    const dir = tempRepo({ ".gitignore": gitignore, "README.md": "hi\n" });
+    const previous = process.cwd();
+    process.chdir(dir);
+    try {
+      git("init", "-q");
+      git("config", "user.name", "t");
+      git("config", "user.email", "t@t");
+      git("commit", "-q", "--allow-empty", "-m", "init");
+      mkdirSync(".ticket2pr/12", { recursive: true });
+      writeFileSync(".ticket2pr/12/PLAN.md", "plan");
+      writeFileSync("feature.ts", "export {};\n");
+      commitAll("Add feature");
+      const committed = git("show", "--name-only", "--format=", "HEAD").split("\n");
+      assert.ok(committed.includes("feature.ts"));
+      assert.ok(committed.every((path) => !path.startsWith(".ticket2pr")));
+    } finally {
+      process.chdir(previous);
+    }
+  });
+}

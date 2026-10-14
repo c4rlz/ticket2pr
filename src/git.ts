@@ -16,7 +16,10 @@ export function createBranch(name: string, base: string): void {
 }
 
 export function commitAll(message: string): void {
-  git("add", "-A", ...EXCLUDE_WORKSPACE);
+  // Stage everything, then unstage our workspace. An exclude pathspec can't do this in one step:
+  // git add rejects it when .ticket2pr/ is gitignored, which `ticket2pr init` makes the norm.
+  git("add", "-A");
+  git("reset", "-q", "--", ".ticket2pr");
   git("commit", "-m", message);
 }
 
