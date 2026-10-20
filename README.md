@@ -57,6 +57,8 @@ ticket2pr implement .ticket2pr/issue-12 --dry-run   # commit locally, no push or
 
 ticket2pr never commits its `.ticket2pr/` working folder, whether or not it's in your `.gitignore`.
 
+If `implement` stops partway, say because a push fails, run the same command again. It picks up where it stopped: once the agent has finished, its work is reused rather than written again, and a commit, push or PR that already exists is skipped. To have the agent start over instead, delete the branch first.
+
 ## Writing a good ticket
 
 The plan can only be as good as the ticket. The planning agent treats acceptance criteria, out-of-scope items, pointers and constraints as binding, so the more of them you give it, the less it has to guess. A good ticket has:

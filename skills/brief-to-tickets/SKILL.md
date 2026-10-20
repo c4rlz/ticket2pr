@@ -38,6 +38,8 @@ ticket2pr's implement agent is deliberately boxed in. It can read and edit files
 - A test runner and a passing `testCommand`. Without one, ticket2pr can't report honest test results, which is half its value.
 - Databases, extensions, migrations, accounts, API keys and environment variables. Name what's needed, but never ask for secret values or put them in a ticket.
 
+The same limit applies inside a ticket. If a ticket's output includes a file that only a command can produce (a generated dataset, a lockfile, a migration, a build artifact), the agent can write the generator but can't run it, so its tests fail on the missing file. Either say in the ticket that the tests must not depend on that file, or list "run the generator and commit its output" as a step done by hand after `implement`.
+
 Keep this list short and concrete. It's a checklist the user works through, not a ticket.
 
 ## 4. Slice the rest into tickets
@@ -47,6 +49,8 @@ Each ticket is one PR that a reviewer could read in one sitting. Aim for each PR
 - **Prefer thin vertical slices.** "Answer a lookup question end to end, with a basic UI" beats "build the database layer". A slice can be tested and demoed on its own, and the next ticket's planner has real code to read.
 - **Order by dependency, then by the brief's priorities.** If the brief says what comes first, follow it unless a dependency forces otherwise, and say why if it does.
 - **Size check.** If the acceptance criteria run past about six bullets, or the ticket touches several unrelated areas, split it. If two tickets each make no sense without the other, merge them.
+- **Make each ticket stand alone.** ticket2pr's agents see the ticket and the repo, never the brief. So copy in, word for word, whatever part of the brief the ticket relies on: the exact questions or user stories it serves, field names, allowed values, the definition of done. Don't write "the brief's seven questions". List them. Repeating a table across several tickets is fine; a planner that has to guess is not.
+- **Look for code the ticket could break.** Before you write a ticket that adds, loads or deletes data, read the code it would go through. Watch for writes that replace or delete everything, and anything that touches real user data or an outside service. If the safe design is a choice only the user can make (for example, a separate database for test data), ask before writing the ticket, then state the choice in the ticket as a constraint.
 - **Don't invent scope.** Every acceptance criterion should trace back to something in the brief. Where the brief leaves a decision open that the ticket needs settled, write `[TODO: ...]` and list it as an open question. Don't guess.
 
 Write each ticket in ticket2pr's template. Its `check` and `plan` steps treat these sections as binding, so the more specific they are, the less the agent guesses:

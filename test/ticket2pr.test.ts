@@ -9,6 +9,8 @@ import { branchName, buildPrBody, prTitle } from "../src/pr.js";
 import { adfToMarkdown, fetchJiraIssue, jiraAuthFromEnv, type AdfNode } from "../src/jira.js";
 import { loadTicket } from "../src/ticket.js";
 import { detectTestCommand, ignoresWorkspace, init } from "../src/init.js";
+import { branchExists, checkout, commitAll, commitsAhead, createBranch, currentBranch, git } from "../src/git.js";
+import { resumePoint } from "../src/resume.js";
 
 const noFiles = () => false;
 
@@ -269,6 +271,70 @@ test("init --jira points the config at Jira instead of adding the issue form", (
     const config = JSON.parse(readFileSync("ticket2pr.config.json", "utf8"));
     assert.deepEqual(config.jira, { baseUrl: "https://acme.atlassian.net" });
     assert.equal(config.testCommand, "npm test");
+  } finally {
+    process.chdir(previous);
+  }
+});
+
+for (const gitignore of [".ticket2pr/\n", ""]) {
+  test(`commitAll commits the work but never .ticket2pr/ (${gitignore ? "ignored" : "not ignored"})`, () => {
+    const dir = tempRepo({ ".gitignore": gitignore, "README.md": "hi\n" });
+    const previous = process.cwd();
+    process.chdir(dir);
+    try {
+      git("init", "-q");
+      git("config", "user.name", "t");
+      git("config", "user.email", "t@t");
+      git("commit", "-q", "--allow-empty", "-m", "init");
+      mkdirSync(".ticket2pr/12", { recursive: true });
+      writeFileSync(".ticket2pr/12/PLAN.md", "plan");
+      writeFileSync("feature.ts", "export {};\n");
+      commitAll("Add feature");
+      const committed = git("show", "--name-only", "--format=", "HEAD").split("\n");
+      assert.ok(committed.includes("feature.ts"));
+      assert.ok(committed.every((path) => !path.startsWith(".ticket2pr")));
+    } finally {
+      process.chdir(previous);
+    }
+  });
+}
+
+test("resumePoint reuses the agent's work only when it finished and left changes", () => {
+  const base = { exists: true, dirty: false, ahead: 0, hasSummary: false };
+  assert.equal(resumePoint({ ...base, exists: false, hasSummary: true, dirty: true }), "fresh");
+  // Crashed in tests or commit: changes uncommitted, summary written.
+  assert.equal(resumePoint({ ...base, dirty: true, hasSummary: true }), "after-agent");
+  // Crashed in push or PR: already committed.
+  assert.equal(resumePoint({ ...base, ahead: 1, hasSummary: true }), "after-agent");
+  // Crashed while the agent was working: no summary yet.
+  assert.equal(resumePoint({ ...base, dirty: true }), "run-agent");
+  // The agent finished but changed nothing.
+  assert.equal(resumePoint({ ...base, hasSummary: true }), "run-agent");
+});
+
+test("branch helpers report what an earlier run left behind", () => {
+  const dir = tempRepo({ "README.md": "hi\n" });
+  const previous = process.cwd();
+  process.chdir(dir);
+  try {
+    git("init", "-q", "-b", "main");
+    git("config", "user.name", "t");
+    git("config", "user.email", "t@t");
+    git("add", "-A");
+    git("commit", "-q", "-m", "init");
+
+    assert.equal(branchExists("ticket2pr/12"), false);
+    createBranch("ticket2pr/12", "main");
+    assert.equal(branchExists("ticket2pr/12"), true);
+    assert.equal(currentBranch(), "ticket2pr/12");
+    assert.equal(commitsAhead("main"), 0);
+
+    writeFileSync("feature.ts", "export {};\n");
+    commitAll("Add feature");
+    assert.equal(commitsAhead("main"), 1);
+
+    checkout("main");
+    assert.equal(currentBranch(), "main");
   } finally {
     process.chdir(previous);
   }
