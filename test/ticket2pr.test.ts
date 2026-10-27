@@ -11,6 +11,7 @@ import { loadTicket } from "../src/ticket.js";
 import { detectTestCommand, ignoresWorkspace, init } from "../src/init.js";
 import { branchExists, checkout, commitAll, commitsAhead, createBranch, currentBranch, git } from "../src/git.js";
 import { resumePoint } from "../src/resume.js";
+import { parseArgs, UsageError } from "../src/args.js";
 
 const noFiles = () => false;
 
@@ -349,4 +350,31 @@ test("branch helpers report what an earlier run left behind", () => {
   } finally {
     process.chdir(previous);
   }
+});
+
+test("parseArgs accepts each command's own flags, in any position", () => {
+  assert.deepEqual(parseArgs([]), { name: "help" });
+  assert.deepEqual(parseArgs(["implement", "--help"]), { name: "help" });
+  assert.deepEqual(parseArgs(["plan", "#12"]), { name: "plan", ticket: "#12" });
+  assert.deepEqual(parseArgs(["check", "PROJ-7"]), { name: "check", ticket: "PROJ-7" });
+  assert.deepEqual(parseArgs(["implement", ".ticket2pr/issue-12"]), { name: "implement", dir: ".ticket2pr/issue-12", dryRun: false });
+  assert.deepEqual(parseArgs(["implement", "--dry-run", "d"]), { name: "implement", dir: "d", dryRun: true });
+  assert.deepEqual(parseArgs(["init"]), { name: "init", jira: undefined });
+  assert.deepEqual(parseArgs(["init", "--jira", "https://a.atlassian.net"]), { name: "init", jira: "https://a.atlassian.net" });
+  assert.deepEqual(parseArgs(["init", "--jira=https://a.atlassian.net"]), { name: "init", jira: "https://a.atlassian.net" });
+});
+
+test("parseArgs rejects typos and stray arguments instead of ignoring them", () => {
+  const rejects = (argv: string[], message: RegExp) =>
+    assert.throws(() => parseArgs(argv), (error) => error instanceof UsageError && message.test(error.message));
+  rejects(["implement", "d", "--dryrun"], /doesn't know the option --dryrun\. It takes: --dry-run/);
+  rejects(["implement", "d", "--dry-run=yes"], /doesn't take a value/);
+  rejects(["plan", "12", "--dry-run"], /It takes no options/);
+  rejects(["implement"], /needs a plan folder/);
+  rejects(["plan"], /needs a ticket/);
+  rejects(["plan", "12", "13"], /takes one argument, but got 2/);
+  rejects(["init", "main"], /doesn't take an argument/);
+  rejects(["init", "--jira"], /--jira needs a value/);
+  rejects(["init", "--jira", "--dry-run"], /--jira needs a value/);
+  rejects(["implemnt", "d"], /Unknown command "implemnt"/);
 });

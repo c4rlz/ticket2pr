@@ -240,3 +240,14 @@ test("implement stops before pushing when the tests fail, and finishes once they
   assert.equal(box.count("claude-calls"), 1);
   assert.match(readFileSync(join(box.repo, PLAN_DIR, "PR.md"), "utf8"), /✅ passed/);
 });
+
+test("implement refuses a mistyped flag before doing anything", () => {
+  const box = sandbox();
+  const { status, output } = box.run(["implement", PLAN_DIR, "--dryrun"]);
+
+  assert.equal(status, 1);
+  assert.match(output, /doesn't know the option --dryrun/);
+  assert.equal(box.count("claude-calls"), 0);
+  assert.equal(box.git("branch", "--show-current"), "main");
+  assert.ok(!remoteHas(box, BRANCH));
+});
