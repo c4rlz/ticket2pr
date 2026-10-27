@@ -59,6 +59,8 @@ ticket2pr never commits its `.ticket2pr/` working folder, whether or not it's in
 
 If `implement` stops partway, say because a push fails, run the same command again. It picks up where it stopped: once the agent has finished, its work is reused rather than written again, and a commit, push or PR that already exists is skipped. To have the agent start over instead, delete the branch first.
 
+If the tests fail, `implement` stops before pushing: nothing leaves your machine and no PR is opened. The agent's work is committed on the branch, so fix the failures there and run the same command again.
+
 ## Writing a good ticket
 
 The plan can only be as good as the ticket. The planning agent treats acceptance criteria, out-of-scope items, pointers and constraints as binding, so the more of them you give it, the less it has to guess. A good ticket has:
@@ -136,7 +138,7 @@ Then ask Claude Code to "break this brief into tickets" and give it the brief.
 
 With `init --jira`, the config also gets `"jira": { "baseUrl": "https://yourcompany.atlassian.net" }`.
 
-Set `testCommand` if you can. The agent is allowed to run exactly that command and nothing else, and ticket2pr runs it again itself afterwards, so the PR reports what actually happened rather than what the agent says happened.
+Set `testCommand` if you can. The agent is allowed to run exactly that command and nothing else, and ticket2pr runs it again itself afterwards, so the PR reports what actually happened rather than what the agent says happened. A PR is only opened once they pass.
 
 ## Jira
 

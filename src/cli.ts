@@ -168,6 +168,14 @@ function implement(dir: string, dryRun: boolean): void {
     return;
   }
 
+  // Failing tests stop here, before anything leaves the machine. The work stays committed on the branch.
+  if (tests && !tests.passed) {
+    throw new Error(
+      `${tests.tail}\n\n\`${tests.command}\` failed, so nothing was pushed and no PR was opened. ` +
+        `The agent's work is committed on ${branch}.\nFix the failures there, then run the same command again.`,
+    );
+  }
+
   git.pushBranch(branch);
   const existing = git.findOpenPr(branch);
   if (existing) {
