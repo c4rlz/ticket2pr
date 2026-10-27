@@ -50,7 +50,7 @@ interface Sandbox {
   count(file: string): number;
 }
 
-function sandbox(): Sandbox {
+function sandbox(testCommand = "echo all tests ok"): Sandbox {
   const root = mkdtempSync(join(tmpdir(), "ticket2pr-implement-"));
   const repo = join(root, "repo");
   const remote = join(root, "remote.git");
@@ -75,7 +75,7 @@ function sandbox(): Sandbox {
   git("config", "user.name", "t");
   git("config", "user.email", "t@t");
   writeFileSync(join(repo, ".gitignore"), ".ticket2pr/\n");
-  writeFileSync(join(repo, "ticket2pr.config.json"), JSON.stringify({ testCommand: "echo all tests ok" }));
+  writeFileSync(join(repo, "ticket2pr.config.json"), JSON.stringify({ testCommand }));
   git("add", "-A");
   git("commit", "-q", "-m", "init");
   git("remote", "add", "origin", remote);
@@ -216,6 +216,29 @@ test("implement opens the PR on a second run if gh failed, and never opens two",
   assert.match(third.output, /PR already open: https:\/\/github\.com\/acme\/app\/pull\/1/);
   assert.equal(box.count("claude-calls"), 1);
   assert.equal(box.count("gh-create-calls"), 1);
+});
+
+test("implement stops before pushing when the tests fail, and finishes once they pass", () => {
+  // Fails while .ticket2pr/broken exists. .ticket2pr/ is ignored, so toggling it leaves the tree clean.
+  const box = sandbox("test ! -e .ticket2pr/broken || (echo 1 test failed; exit 1)");
+  writeFileSync(join(box.repo, ".ticket2pr/broken"), "");
+  const first = box.run(["implement", PLAN_DIR]);
+
+  assert.equal(first.status, 1);
+  assert.match(first.output, /Tests FAILED/);
+  assert.match(first.output, /1 test failed/);
+  assert.match(first.output, /nothing was pushed and no PR was opened/);
+  assert.equal(box.git("rev-list", "--count", "main..HEAD"), "1");
+  assert.ok(!remoteHas(box, BRANCH));
+  assert.equal(box.count("gh-create-calls"), 0);
+
+  rmSync(join(box.repo, ".ticket2pr/broken"));
+  const second = box.run(["implement", PLAN_DIR]);
+  assert.equal(second.status, 0, second.output);
+  assert.match(second.output, /Tests passed/);
+  assert.match(second.output, /Draft PR:/);
+  assert.equal(box.count("claude-calls"), 1);
+  assert.match(readFileSync(join(box.repo, PLAN_DIR, "PR.md"), "utf8"), /✅ passed/);
 });
 
 test("implement refuses a mistyped flag before doing anything", () => {

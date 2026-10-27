@@ -69,6 +69,17 @@ test("buildPrBody links the issue, reports tests honestly and includes the plan"
   assert.equal(branchName("ticket2pr/", ticket), "ticket2pr/issue-3");
 });
 
+test("buildPrBody keeps passing test output out of the PR", () => {
+  const body = buildPrBody({
+    ticket: { id: "x", title: "x", body: "" },
+    plan: "plan",
+    agentSummary: "summary",
+    tests: { command: "npm test", passed: true, tail: "22 passed" },
+  });
+  assert.match(body, /`npm test` ✅ passed/);
+  assert.doesNotMatch(body, /22 passed/);
+});
+
 test("buildPrBody says so when no tests were run", () => {
   const body = buildPrBody({
     ticket: { id: "x", title: "x", body: "" },
