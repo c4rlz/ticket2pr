@@ -15,17 +15,18 @@ export function buildPrBody({ ticket, plan, agentSummary, tests }: PrBodyInput):
   if (ticket.jiraKey) sections.push(`Jira: [${ticket.jiraKey}](${ticket.url})`);
 
   sections.push(
-    "> Draft opened by ticket2pr. The plan below was reviewed by a human before " +
-      "implementation; the code has not been reviewed yet.",
+    "> Draft by ticket2pr. A human approved the plan; the code hasn't been reviewed yet.",
   );
 
   sections.push(agentSummary);
 
   if (tests) {
-    const status = tests.passed ? "✅ passed" : "❌ failed";
+    // A passing run needs no output. A failing run never opens a PR, but PR.md keeps its output.
     sections.push(
-      `## Tests\n\`${tests.command}\` ${status}\n\n` +
-        `<details><summary>Output (last lines)</summary>\n\n\`\`\`\n${tests.tail}\n\`\`\`\n</details>`,
+      tests.passed
+        ? `## Tests\n\`${tests.command}\` ✅ passed`
+        : `## Tests\n\`${tests.command}\` ❌ failed\n\n` +
+            `<details><summary>Output (last lines)</summary>\n\n\`\`\`\n${tests.tail}\n\`\`\`\n</details>`,
     );
   } else {
     sections.push("## Tests\nNo test command configured, so tests were not run.");

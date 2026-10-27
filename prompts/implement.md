@@ -20,13 +20,15 @@ You are implementing an approved plan in the repository in your current working 
 
 ## Final response
 
-When you're done, respond with only a summary for the pull request description, in exactly this structure:
+When you're done, respond with only a summary for the pull request description. A busy person will read it before reviewing the diff, so they need to understand it in under a minute. Keep it under 150 words. The diff already shows which files changed, so don't walk through them. Use plain language, and don't repeat the ticket or the plan.
+
+Use exactly this structure:
 
 ## What changed
-A short description of the change, with the main files.
+One to three sentences on what the change does.
 
 ## Deviations from the plan
-Anything you did differently from the plan, and why. Write "None" if there were none.
+One short bullet per deviation, with the reason. Write "None" if there were none.
 
 ## Things to check
-Where a reviewer should look most carefully, and anything you were unsure about.
+At most three short bullets on what a reviewer must look at or do by hand. Write "Nothing special" if there's nothing.
