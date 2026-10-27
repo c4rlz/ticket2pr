@@ -217,3 +217,14 @@ test("implement opens the PR on a second run if gh failed, and never opens two",
   assert.equal(box.count("claude-calls"), 1);
   assert.equal(box.count("gh-create-calls"), 1);
 });
+
+test("implement refuses a mistyped flag before doing anything", () => {
+  const box = sandbox();
+  const { status, output } = box.run(["implement", PLAN_DIR, "--dryrun"]);
+
+  assert.equal(status, 1);
+  assert.match(output, /doesn't know the option --dryrun/);
+  assert.equal(box.count("claude-calls"), 0);
+  assert.equal(box.git("branch", "--show-current"), "main");
+  assert.ok(!remoteHas(box, BRANCH));
+});

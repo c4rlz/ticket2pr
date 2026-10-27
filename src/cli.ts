@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runAgent } from "./agent.js";
+import { parseArgs, UsageError } from "./args.js";
 import { loadConfig } from "./config.js";
 import { init } from "./init.js";
 import * as git from "./git.js";
@@ -179,21 +180,18 @@ function implement(dir: string, dryRun: boolean): void {
 }
 
 async function main(argv: string[]): Promise<void> {
-  const [command, target, ...flags] = argv;
-  if (command === "init") {
-    const jiraFlag = argv.indexOf("--jira");
-    return setUp(jiraFlag === -1 ? undefined : (argv[jiraFlag + 1] ?? ""));
-  }
-  if (command === "check" && target) return check(target);
-  if (command === "plan" && target) return plan(target);
-  if (command === "implement" && target) return implement(target, flags.includes("--dry-run"));
-  console.log(USAGE);
-  if (command && command !== "help" && command !== "--help") process.exitCode = 1;
+  const command = parseArgs(argv);
+  if (command.name === "help") return void console.log(USAGE);
+  if (command.name === "init") return setUp(command.jira);
+  if (command.name === "check") return check(command.ticket);
+  if (command.name === "plan") return plan(command.ticket);
+  return implement(command.dir, command.dryRun);
 }
 
 try {
   await main(process.argv.slice(2));
 } catch (error) {
   console.error(`\n${error instanceof Error ? error.message : String(error)}`);
+  if (error instanceof UsageError) console.error('Run "ticket2pr help" to see how to use it.');
   process.exitCode = 1;
 }
